@@ -317,6 +317,18 @@
     
     const ctx = overlayCanvas.getContext("2d");
 
+    function getUIState() {
+        const cp = document.querySelector('control-panel') || document.querySelector('build-menu');
+        return cp ? cp.uiState : null;
+    }
+
+    function isAimingNuke() {
+        const uiState = getUIState();
+        if (!uiState) return false;
+        const gs = uiState.ghostStructure;
+        return gs === "Atom Bomb" || gs === "Hydrogen Bomb" || gs === "MIRV";
+    }
+
     function renderLoop() {
         requestAnimationFrame(renderLoop);
         
@@ -381,6 +393,64 @@
             ctx.fillStyle = "rgba(255, 0, 0, 0.15)";
             ctx.fill();
         });
+
+        // SAM Hover Calculation
+        if (isAimingNuke()) {
+            const worldMouse = screenToWorld(mouseX, mouseY);
+            if (worldMouse) {
+                let totalInterceptions = 0;
+                const game = getGameInstance();
+                const gm = game && typeof game.map === 'function' ? game.map() : game;
+                const config = game && typeof game.config === 'function' ? game.config() : null;
+                const myId = game && typeof game.player === 'function' && game.player() ? game.player().id() : null;
+                
+                if (game && typeof game.units === 'function' && gm && typeof gm.x === 'function') {
+                    const units = game.units();
+                    for (const unit of units) {
+                        if (typeof unit.type === 'function' && unit.type() === "SAM Launcher") {
+                            const owner = typeof unit.owner === 'function' ? unit.owner() : null;
+                            if (owner && owner.id() === myId) continue;
+                            
+                            const tile = typeof unit.tile === 'function' ? unit.tile() : null;
+                            if (tile !== null) {
+                                const sx = gm.x(tile);
+                                const sy = gm.y(tile);
+                                const dx = sx - worldMouse.x;
+                                const dy = sy - worldMouse.y;
+                                const dist = Math.sqrt(dx*dx + dy*dy);
+                                
+                                const level = typeof unit.level === 'function' ? unit.level() : 1;
+                                const range = config && typeof config.samRange === 'function' ? config.samRange(level) : (150 - 480/(level+5));
+                                
+                                if (dist <= range) {
+                                    totalInterceptions += level;
+                                    
+                                    const samScreen = worldToScreen(sx, sy);
+                                    ctx.beginPath();
+                                    ctx.arc(samScreen.x, samScreen.y, range * pixelsPerTile, 0, Math.PI * 2);
+                                    ctx.fillStyle = "rgba(255, 0, 0, 0.1)";
+                                    ctx.fill();
+                                    ctx.strokeStyle = "rgba(255, 0, 0, 0.5)";
+                                    ctx.lineWidth = 1;
+                                    ctx.stroke();
+                                }
+                            }
+                        }
+                    }
+                    
+                    const text = `Nukes requises : ${totalInterceptions + 1} (${totalInterceptions} intercep.)`;
+                    ctx.font = "bold 14px Arial";
+                    const tw = ctx.measureText(text).width;
+                    
+                    ctx.fillStyle = "rgba(0, 0, 0, 0.8)";
+                    ctx.fillRect(mouseX + 15, mouseY + 15, tw + 20, 30);
+                    
+                    ctx.fillStyle = totalInterceptions > 0 ? "#ff4444" : "#44ff44";
+                    ctx.textAlign = "left";
+                    ctx.fillText(text, mouseX + 25, mouseY + 35);
+                }
+            }
+        }
     }
     renderLoop();
 
