@@ -318,8 +318,13 @@
     const ctx = overlayCanvas.getContext("2d");
 
     function getUIState() {
-        const cp = document.querySelector('control-panel') || document.querySelector('build-menu');
+        const cp = document.querySelector('control-panel') || document.querySelector('build-menu') || document.querySelector('unit-display');
         return cp ? cp.uiState : null;
+    }
+
+    function getGameInstance() {
+        const lb = document.querySelector('leader-board');
+        return lb ? lb.game : null;
     }
 
     function isAimingNuke() {
